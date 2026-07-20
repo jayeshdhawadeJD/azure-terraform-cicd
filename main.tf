@@ -11,11 +11,13 @@ terraform {
     storage_account_name = "tfstatejd2026"
     container_name        = "tfstate"
     key                    = "demo-infra.tfstate"
+    use_oidc               = true
   }
 }
 
 provider "azurerm" {
   features {}
+  use_oidc = true
 }
 
 resource "azurerm_resource_group" "demo" {
