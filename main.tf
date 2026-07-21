@@ -36,6 +36,6 @@ resource "azurerm_storage_account" "demo" {
 
 resource "azurerm_storage_container" "demo" {
   name                  = "demo-files"
-  storage_account_id    = azurerm_storage_account.demo.name
+  storage_account_name    = azurerm_storage_account.demo.name
   container_access_type = "private"
 }
