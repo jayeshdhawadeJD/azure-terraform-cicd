@@ -12,7 +12,6 @@ permissions:
 jobs:
   plan:
     name: Terraform Plan
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -48,7 +47,8 @@ jobs:
 
   apply:
     name: Terraform Apply
-    if: github.event_name == 'workflow_dispatch'
+    needs: plan
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
