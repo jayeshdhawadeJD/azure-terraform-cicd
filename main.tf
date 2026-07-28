@@ -39,3 +39,11 @@ resource "azurerm_storage_container" "demo" {
   storage_account_name    = azurerm_storage_account.demo.name
   container_access_type = "private"
 }
+
+resource "azurerm_container_registry" "demo" {
+  name                = "acroptfdemojd2026"  # must be globally unique
+  resource_group_name = azurerm_resource_group.demo.name
+  location            = azurerm_resource_group.demo.location
+  sku                 = "Basic"
+  admin_enabled       = false
+}
