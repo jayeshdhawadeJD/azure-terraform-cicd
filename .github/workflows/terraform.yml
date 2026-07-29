@@ -29,32 +29,28 @@ jobs:
         run: |
           docker build -t ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest app/
 
-
       - name: Push image to GHCR
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker push ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.10.5"
-
       - name: Terraform Init
-        run: terraform init
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
+            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_USE_OIDC=true \
+            hashicorp/terraform:1.10.5 init
 
       - name: Terraform Plan
-        run: terraform plan
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
+            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_USE_OIDC=true \
+            hashicorp/terraform:1.10.5 plan
 
   apply:
     name: Terraform Apply
@@ -72,23 +68,20 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.10.5"
-
       - name: Terraform Init
-        run: terraform init
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
+            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_USE_OIDC=true \
+            hashicorp/terraform:1.10.5 init
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
+            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_USE_OIDC=true \
+            hashicorp/terraform:1.10.5 apply -auto-approve
