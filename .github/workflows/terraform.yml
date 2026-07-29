@@ -37,18 +37,20 @@ jobs:
       - name: Terraform Init
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
-            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
-            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
-            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_OIDC_TOKEN \
+            -e ARM_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
             hashicorp/terraform:1.10.5 init
 
       - name: Terraform Plan
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
-            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
-            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
-            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_OIDC_TOKEN \
+            -e ARM_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
             hashicorp/terraform:1.10.5 plan
 
@@ -71,17 +73,19 @@ jobs:
       - name: Terraform Init
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
-            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
-            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
-            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_OIDC_TOKEN \
+            -e ARM_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
             hashicorp/terraform:1.10.5 init
 
       - name: Terraform Apply
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
-            -e ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }} \
-            -e ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }} \
-            -e ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }} \
+            -e ARM_OIDC_TOKEN \
+            -e ARM_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
+            -e ARM_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+            -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
             hashicorp/terraform:1.10.5 apply -auto-approve
