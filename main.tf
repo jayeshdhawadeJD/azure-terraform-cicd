@@ -40,3 +40,34 @@ resource "azurerm_storage_container" "demo" {
   container_access_type = "private"
 }
 
+resource "azurerm_container_app_environment" "demo" {
+  name                = "cae-portfolio-demo"
+  location            = azurerm_resource_group.demo.location
+  resource_group_name = azurerm_resource_group.demo.name
+}
+
+resource "azurerm_container_app" "demo" {
+  name                         = "ca-portfolio-flask"
+  container_app_environment_id = azurerm_container_app_environment.demo.id
+  resource_group_name          = azurerm_resource_group.demo.name
+  revision_mode                = "Single"
+
+  template {
+    container {
+      name   = "flask-app"
+      image  = "ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest"
+      cpu    = 0.25
+      memory = "0.5Gi"
+    }
+  }
+
+  ingress {
+    allow_insecure_connections = false
+    external_enabled           = true
+    target_port                = 5000
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+}
