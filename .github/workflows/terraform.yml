@@ -8,6 +8,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  packages: write
 
 jobs:
   plan:
@@ -23,14 +24,16 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Build Docker image
         run: |
-          docker build -t acroptfdemojd2026.azurecr.io/portfolio-flask:latest app/
+          docker build -t ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest app/
 
-      - name: Push image to ACR
+
+      - name: Push image to GHCR
         run: |
-          az acr login --name acroptfdemojd2026
-          docker push acroptfdemojd2026.azurecr.io/portfolio-flask:latest
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
