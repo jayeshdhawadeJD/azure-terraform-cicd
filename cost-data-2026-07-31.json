@@ -1,0 +1,20 @@
+﻿{
+    "resources":  [
+                      {
+                          "resourceId":  "/subscriptions/bb8f8c0b-6d1b-4593-882b-d9f264692833/resourcegroups/rg-portfolio-demo/providers/microsoft.containerregistry/registries/acroptfdemojd2026",
+                          "cost":  11.7014,
+                          "currency":  "INR"
+                      },
+                      {
+                          "resourceId":  "/subscriptions/bb8f8c0b-6d1b-4593-882b-d9f264692833/resourcegroups/rg-portfolio-demo/providers/microsoft.storage/storageaccounts/stportfoliodemo01",
+                          "cost":  0.0057,
+                          "currency":  "INR"
+                      },
+                      {
+                          "resourceId":  "/subscriptions/bb8f8c0b-6d1b-4593-882b-d9f264692833/resourcegroups/rg-tfstate/providers/microsoft.storage/storageaccounts/tfstatejd2026",
+                          "cost":  0.0133,
+                          "currency":  "INR"
+                      }
+                  ],
+    "date":  "2026-07-31"
+}
