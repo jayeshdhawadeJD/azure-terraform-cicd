@@ -6,9 +6,29 @@ $outputFile = "cost-data-$(Get-Date -Format 'yyyy-MM-dd').json"
 $storageAccount = "stportfoliodemo01"
 $containerName = "demo-list"
 
-$result = az rest --method post `
-  --url "https://management.azure.com/subscriptions/$subscriptionId/providers/Microsoft.CostManagement/query?api-version=2023-11-01" `
-  --body "@$bodyFile" | ConvertFrom-Json
+$maxRetries = 5
+$attempt = 0
+$result = $null
+
+while ($attempt -lt $maxRetries -and $null -eq $result) {
+  $attempt++
+  Write-Host "Attempt $attempt of $maxRetries..."
+
+  $response = az rest --method post `
+    --url "https://management.azure.com/subscriptions/$subscriptionId/providers/Microsoft.CostManagement/query?api-version=2023-11-01" `
+    --body "@$bodyFile" 2>&1
+
+  if ($response -match "429|Too Many Requests" -or $LASTEXITCODE -ne 0) {
+    Write-Host "Rate limited or failed. Waiting $($attempt * 30) seconds..."
+    Start-Sleep -Seconds ($attempt * 30)
+  } else {
+    $result = $response | ConvertFrom-Json
+  }
+}
+
+if ($null -eq $result) {
+  throw "Failed to get cost data after $maxRetries attempts"
+}
 
 $costData = @{
   date       = (Get-Date -Format "yyyy-MM-dd")
