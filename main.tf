@@ -51,7 +51,9 @@ resource "azurerm_container_app" "demo" {
   container_app_environment_id = azurerm_container_app_environment.demo.id
   resource_group_name          = azurerm_resource_group.demo.name
   revision_mode                = "Single"
-
+   identity {
+    type = "SystemAssigned"
+  }
   template {
     container {
       name   = "flask-app"
@@ -71,3 +73,4 @@ resource "azurerm_container_app" "demo" {
     }
   }
 }
+
