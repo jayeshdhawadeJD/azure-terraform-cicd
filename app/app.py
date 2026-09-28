@@ -24,7 +24,7 @@ def friendly_resource(resource_id):
     return name, label
 
 
-def fetch_latest_cost_data():
+def fetch_all_cost_data():
     credential = DefaultAzureCredential()
     service = BlobServiceClient(
         account_url=f"https://{ACCOUNT_NAME}.blob.core.windows.net",
@@ -33,32 +33,46 @@ def fetch_latest_cost_data():
     container = service.get_container_client(CONTAINER_NAME)
 
     blobs = [b for b in container.list_blobs() if b.name.startswith("cost-data-")]
-    if not blobs:
-        return None
+    blobs.sort(key=lambda b: b.name)
 
-    latest = max(blobs, key=lambda b: b.name)
-    raw = container.get_blob_client(latest.name).download_blob().readall().decode("utf-8")
-    return json.loads(raw)
+    history = []
+    for blob in blobs:
+        raw = container.get_blob_client(blob.name).download_blob().readall().decode("utf-8")
+        data = json.loads(raw)
+        resources = data.get("resources", [])
+        history.append({
+            "filename": blob.name,
+            "date": data.get("date", blob.name),
+            "total": sum(r.get("cost", 0) for r in resources),
+            "resources": resources,
+        })
+    return history
 
 
 @app.route("/")
 def dashboard():
-    data = fetch_latest_cost_data()
+    history = fetch_all_cost_data()
 
-    if data is None:
+    if not history:
         return render_template(
             "index.html",
+            empty=True,
             resources=[],
             data_date="—",
             currency="—",
             total_cost="—",
+            total_cost_raw=0,
             resource_count=0,
+            days_tracked=0,
+            trend_labels=[],
+            trend_totals=[],
         )
 
-    resources = data.get("resources", [])
+    latest = history[-1]
+    resources = latest["resources"]
     currency = resources[0].get("currency", "INR") if resources else "INR"
     symbol = "₹" if currency.upper() == "INR" else f"{currency} "
-    total = sum(r.get("cost", 0) for r in resources)
+    total = latest["total"]
 
     rows = []
     for r in resources:
@@ -72,16 +86,20 @@ def dashboard():
             "cost_display": f"{symbol}{cost:,.4f}",
             "percent": f"{share:.1f}%",
         })
-
     rows.sort(key=lambda r: r["cost"], reverse=True)
 
     return render_template(
         "index.html",
+        empty=False,
         resources=rows,
-        data_date=data.get("date", "—"),
+        data_date=latest["date"],
         currency=currency,
         total_cost=f"{symbol}{total:,.4f}",
+        total_cost_raw=total,
         resource_count=len(rows),
+        days_tracked=len(history),
+        trend_labels=[h["date"] for h in history],
+        trend_totals=[h["total"] for h in history],
     )
 
 

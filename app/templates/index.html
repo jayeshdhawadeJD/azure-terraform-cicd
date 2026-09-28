@@ -4,63 +4,221 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Azure Cost Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 40px auto; max-width: 900px; color: #333; }
-        h1 { color: #0078d4; }
-        .date { color: #888; font-size: 13px; }
-        .summary { display: flex; gap: 16px; margin: 20px 0; }
-        .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px 24px; background: #f7f9fc; flex: 1; }
-        .card .value { font-size: 26px; font-weight: bold; color: #0078d4; }
-        .card .label { font-size: 13px; color: #666; margin-top: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; }
-        th { background: #0078d4; color: white; }
-        tr:hover { background: #f0f6fc; }
-        .pct { color: #666; }
-        .empty { color: #666; font-style: italic; }
-        footer { margin-top: 32px; font-size: 12px; color: #aaa; }
+        :root {
+            --bg: #0b1020;
+            --panel: rgba(255, 255, 255, 0.04);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #22d3ee;
+            --accent2: #818cf8;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background:
+                radial-gradient(1200px 800px at 80% -10%, #1e1b4b 0%, transparent 55%),
+                radial-gradient(1000px 700px at -10% 110%, #164e63 0%, transparent 50%),
+                var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 40px 24px;
+        }
+        .wrap { max-width: 1020px; margin: 0 auto; }
+        header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+        .logo {
+            width: 52px; height: 52px; border-radius: 14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: grid; place-items: center;
+            box-shadow: 0 8px 30px rgba(34, 211, 238, 0.35);
+        }
+        .logo svg { width: 28px; height: 28px; fill: #0b1020; }
+        h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+        .sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 20px 22px;
+            backdrop-filter: blur(8px);
+            transition: transform .15s ease, border-color .15s ease;
+        }
+        .card:hover { transform: translateY(-3px); border-color: rgba(34, 211, 238, 0.4); }
+        .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+        .card .value {
+            font-size: 30px; font-weight: 700; margin-top: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .card .value.small { font-size: 22px; }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 22px;
+            margin-bottom: 24px;
+        }
+        .panel h2 { font-size: 16px; font-weight: 600; }
+        .hint { color: var(--muted); font-size: 12.5px; margin: 4px 0 18px; }
+        .chart-box { position: relative; height: 280px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left; color: var(--muted); font-size: 12px;
+            text-transform: uppercase; letter-spacing: .06em;
+            padding: 10px 12px; border-bottom: 1px solid var(--panel-border);
+        }
+        td { padding: 14px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 14.5px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(129, 140, 248, 0.06); }
+        .badge {
+            display: inline-block; padding: 4px 10px; border-radius: 999px;
+            font-size: 12.5px; background: rgba(34, 211, 238, 0.12); color: var(--accent);
+        }
+        .cost { font-weight: 600; }
+        .pct { color: var(--muted); }
+        .empty { color: var(--muted); font-style: italic; padding: 24px 0; text-align: center; }
+        footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; }
     </style>
 </head>
 <body>
-    <h1>Azure Cost Dashboard</h1>
-    <p class="date">Data as of {{ data_date }} &middot; Currency: {{ currency }}</p>
+<div class="wrap">
+    <header>
+        <div class="logo">
+            <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        </div>
+        <div>
+            <h1>Azure Cost Dashboard</h1>
+            <div class="sub">Live cost insights from Azure Cost Management</div>
+        </div>
+    </header>
 
-    <div class="summary">
+    <div class="cards">
         <div class="card">
-            <div class="value">{{ resource_count }}</div>
             <div class="label">Tracked resources</div>
+            <div class="value" data-count="{{ resource_count }}">{{ resource_count }}</div>
         </div>
         <div class="card">
-            <div class="value">{{ total_cost }}</div>
             <div class="label">Total cost</div>
+            <div class="value" data-count="{{ total_cost_raw }}" data-prefix="{{ '₹' if currency == 'INR' else (currency ~ ' ') }}">{{ total_cost }}</div>
+        </div>
+        <div class="card">
+            <div class="label">Days tracked</div>
+            <div class="value" data-count="{{ days_tracked }}">{{ days_tracked }}</div>
+        </div>
+        <div class="card">
+            <div class="label">Data as of</div>
+            <div class="value small">{{ data_date }}</div>
         </div>
     </div>
 
-    {% if resources %}
-    <table>
-        <thead>
-            <tr>
-                <th>Resource</th>
-                <th>Type</th>
-                <th>Cost</th>
-                <th>Share</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in resources %}
-            <tr>
-                <td>{{ r.name }}</td>
-                <td>{{ r.type }}</td>
-                <td>{{ r.cost_display }}</td>
-                <td class="pct">{{ r.percent }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="empty">No cost data available yet.</p>
-    {% endif %}
+    <div class="panel">
+        <h2>Cost Trend</h2>
+        <div class="hint">Daily total cost across tracked resources</div>
+        {% if trend_labels %}
+        <div class="chart-box"><canvas id="trendChart"></canvas></div>
+        {% else %}
+        <p class="empty">Not enough data to plot a trend yet.</p>
+        {% endif %}
+    </div>
 
-    <footer>Pulled daily by GitHub Actions from Azure Cost Management API &middot; Rendered by Flask on Azure Container Apps</footer>
+    <div class="panel">
+        <h2>Resource Breakdown</h2>
+        <div class="hint">Cost by resource, highest first</div>
+        {% if resources %}
+        <table>
+            <thead>
+                <tr><th>Resource</th><th>Type</th><th>Cost</th><th>Share</th></tr>
+            </thead>
+            <tbody>
+            {% for r in resources %}
+                <tr>
+                    <td><span class="badge">{{ r.name }}</span></td>
+                    <td>{{ r.type }}</td>
+                    <td class="cost">{{ r.cost_display }}</td>
+                    <td class="pct">{{ r.percent }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty">No cost data available yet.</p>
+        {% endif %}
+    </div>
+
+    <footer>Pulled daily by GitHub Actions from Azure Cost Management API &middot; Rendered by Flask on Azure Container Apps &middot; Managed identity &mdash; no secrets</footer>
+</div>
+
+<script>
+    const labels = {{ trend_labels | tojson }};
+    const values = {{ trend_totals | tojson }};
+    const ctx = document.getElementById('trendChart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Total daily cost',
+                    data: values,
+                    borderColor: '#22d3ee',
+                    backgroundColor: (c) => {
+                        const { ctx: g, chartArea } = c.chart;
+                        if (!chartArea) return 'rgba(34,211,238,0.1)';
+                        const grad = g.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                        grad.addColorStop(0, 'rgba(34,211,238,0.35)');
+                        grad.addColorStop(1, 'rgba(34,211,238,0)');
+                        return grad;
+                    },
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: '#22d3ee',
+                    pointBorderColor: '#0b1020',
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(11,16,32,0.92)',
+                        titleColor: '#e2e8f0',
+                        bodyColor: '#22d3ee',
+                        padding: 12,
+                        cornerRadius: 10,
+                    }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+                }
+            }
+        });
+    }
+
+    document.querySelectorAll('[data-count]').forEach(el => {
+        const target = parseFloat(el.dataset.count || '0');
+        const prefix = el.dataset.prefix || '';
+        const isInt = Number.isInteger(target);
+        const dur = 900;
+        const start = performance.now();
+        function tick(now) {
+            const p = Math.min((now - start) / dur, 1);
+            const eased = 1 - Math.pow(1 - p, 3);
+            const val = target * eased;
+            el.textContent = prefix + (isInt ? String(Math.round(val)) : val.toLocaleString('en-IN', { maximumFractionDigits: 4 }));
+            if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    });
+</script>
 </body>
 </html>
