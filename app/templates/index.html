@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Cost Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 40px auto; max-width: 900px; color: #333; }
+        h1 { color: #0078d4; }
+        .date { color: #888; font-size: 13px; }
+        .summary { display: flex; gap: 16px; margin: 20px 0; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px 24px; background: #f7f9fc; flex: 1; }
+        .card .value { font-size: 26px; font-weight: bold; color: #0078d4; }
+        .card .label { font-size: 13px; color: #666; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; }
+        th { background: #0078d4; color: white; }
+        tr:hover { background: #f0f6fc; }
+        .pct { color: #666; }
+        .empty { color: #666; font-style: italic; }
+        footer { margin-top: 32px; font-size: 12px; color: #aaa; }
+    </style>
+</head>
+<body>
+    <h1>Azure Cost Dashboard</h1>
+    <p class="date">Data as of {{ data_date }} &middot; Currency: {{ currency }}</p>
+
+    <div class="summary">
+        <div class="card">
+            <div class="value">{{ resource_count }}</div>
+            <div class="label">Tracked resources</div>
+        </div>
+        <div class="card">
+            <div class="value">{{ total_cost }}</div>
+            <div class="label">Total cost</div>
+        </div>
+    </div>
+
+    {% if resources %}
+    <table>
+        <thead>
+            <tr>
+                <th>Resource</th>
+                <th>Type</th>
+                <th>Cost</th>
+                <th>Share</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in resources %}
+            <tr>
+                <td>{{ r.name }}</td>
+                <td>{{ r.type }}</td>
+                <td>{{ r.cost_display }}</td>
+                <td class="pct">{{ r.percent }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No cost data available yet.</p>
+    {% endif %}
+
+    <footer>Pulled daily by GitHub Actions from Azure Cost Management API &middot; Rendered by Flask on Azure Container Apps</footer>
+</body>
+</html>
