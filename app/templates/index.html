@@ -84,6 +84,24 @@
         .pct { color: var(--muted); }
         .empty { color: var(--muted); font-style: italic; padding: 24px 0; text-align: center; }
         footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; }
+
+        .suggestions { display: grid; gap: 12px; }
+        .suggestion {
+            display: flex; gap: 14px; align-items: flex-start;
+            padding: 14px 16px; border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .suggestion .dot {
+            width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex-shrink: 0;
+        }
+        .suggestion.info { border-left: 3px solid var(--accent); }
+        .suggestion.info .dot { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+        .suggestion.warning { border-left: 3px solid #fbbf24; }
+        .suggestion.warning .dot { background: #fbbf24; box-shadow: 0 0 12px #fbbf24; }
+        .suggestion.danger { border-left: 3px solid #f87171; }
+        .suggestion.danger .dot { background: #f87171; box-shadow: 0 0 12px #f87171; }
+        .suggestion .title { font-weight: 600; font-size: 14.5px; }
+        .suggestion .msg { color: var(--muted); font-size: 13.5px; margin-top: 3px; }
     </style>
 </head>
 <body>
@@ -124,6 +142,26 @@
         <div class="chart-box"><canvas id="trendChart"></canvas></div>
         {% else %}
         <p class="empty">Not enough data to plot a trend yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h2>Cost-Saving Suggestions</h2>
+        <div class="hint">Automated recommendations based on current usage</div>
+        {% if suggestions %}
+        <div class="suggestions">
+            {% for s in suggestions %}
+            <div class="suggestion {{ s.level }}">
+                <span class="dot"></span>
+                <div>
+                    <div class="title">{{ s.title }}</div>
+                    <div class="msg">{{ s.message }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No suggestions available yet.</p>
         {% endif %}
     </div>
 

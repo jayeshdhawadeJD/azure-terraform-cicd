@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from flask import Flask, render_template
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
@@ -22,6 +23,55 @@ def friendly_resource(resource_id):
     rtype = parts[-2] if len(parts) > 1 else ""
     label = RESOURCE_TYPE_LABELS.get(rtype, rtype.upper())
     return name, label
+
+
+def get_suggestions(latest):
+    suggestions = []
+
+    try:
+        date_str = latest["filename"].replace("cost-data-", "").replace(".json", "")
+        data_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        age_days = (datetime.now(timezone.utc).date() - data_date).days
+        if age_days > 1:
+            suggestions.append({
+                "level": "warning",
+                "title": "Cost data may be stale",
+                "message": f"Latest data is {age_days} days old ({latest['date']}). Check the Cost Data Pull workflow."
+            })
+    except ValueError:
+        pass
+
+    resources = latest.get("resources", [])
+    if not resources:
+        return suggestions
+
+    total = sum(r.get("cost", 0) for r in resources)
+
+    top = max(resources, key=lambda r: r.get("cost", 0))
+    if total and top.get("cost", 0) / total >= 0.5:
+        name, _ = friendly_resource(top.get("resourceId", ""))
+        suggestions.append({
+            "level": "warning",
+            "title": "Largest cost driver: " + name,
+            "message": f"{name} accounts for {top['cost']/total:.0%} of total cost. Review if it must run 24/7 or can be right-sized."
+        })
+
+    inactive = [friendly_resource(r.get("resourceId", ""))[0] for r in resources if r.get("cost") == 0]
+    if inactive:
+        suggestions.append({
+            "level": "danger",
+            "title": "Inactive resources",
+            "message": ", ".join(inactive) + " reported zero cost. Consider deleting to avoid future charges."
+        })
+
+    if not suggestions:
+        suggestions.append({
+            "level": "info",
+            "title": "Costs look healthy",
+            "message": "No major cost concerns detected right now."
+        })
+
+    return suggestions
 
 
 def fetch_all_cost_data():
@@ -66,6 +116,7 @@ def dashboard():
             days_tracked=0,
             trend_labels=[],
             trend_totals=[],
+            suggestions=[],
         )
 
     latest = history[-1]
@@ -100,6 +151,7 @@ def dashboard():
         days_tracked=len(history),
         trend_labels=[h["date"] for h in history],
         trend_totals=[h["total"] for h in history],
+        suggestions=get_suggestions(latest),
     )
 
 
