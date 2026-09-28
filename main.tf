@@ -21,6 +21,12 @@ provider "azurerm" {
   use_oidc = true
 }
 
+variable "image_tag" {
+  description = "Container image tag to deploy"
+  type        = string
+  default     = "latest"
+}
+
 resource "azurerm_resource_group" "demo" {
   name     = "rg-portfolio-demo"
   location = "centralindia"
@@ -57,7 +63,7 @@ resource "azurerm_container_app" "demo" {
   template {
     container {
       name   = "flask-app"
-      image  = "ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest"
+      image  = "ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:${var.image_tag}"
       cpu    = 0.25
       memory = "0.5Gi"
     }

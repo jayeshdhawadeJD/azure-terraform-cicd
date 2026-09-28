@@ -27,12 +27,13 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest app/
+          docker build -t ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest -t ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:${{ github.sha }} app/
 
       - name: Push image to GHCR
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker push ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:latest
+          docker push ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:${{ github.sha }}
 
       - name: Terraform Init
         run: |
@@ -56,7 +57,7 @@ jobs:
             -e ARM_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
             -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
-            hashicorp/terraform:1.10.5 plan
+            hashicorp/terraform:1.10.5 plan -var image_tag=${{ github.sha }}
 
   apply:
     name: Terraform Apply
@@ -96,4 +97,4 @@ jobs:
             -e ARM_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
             -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
-            hashicorp/terraform:1.10.5 apply -auto-approve
+            hashicorp/terraform:1.10.5 apply -auto-approve -var image_tag=${{ github.sha }}
