@@ -37,7 +37,7 @@ def fetch_all_cost_data():
 
     history = []
     for blob in blobs:
-        raw = container.get_blob_client(blob.name).download_blob().readall().decode("utf-8")
+        raw = container.get_blob_client(blob.name).download_blob().readall().decode("utf-8-sig")
         data = json.loads(raw)
         resources = data.get("resources", [])
         history.append({
