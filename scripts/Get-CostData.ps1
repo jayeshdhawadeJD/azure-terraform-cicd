@@ -17,12 +17,17 @@ while ($attempt -lt $maxRetries -and $null -eq $result) {
   $response = az rest --method post `
     --url "https://management.azure.com/subscriptions/$subscriptionId/providers/Microsoft.CostManagement/query?api-version=2023-11-01" `
     --body "@$bodyFile" 2>&1
+  $exit = $LASTEXITCODE
 
-  if ($response -match "429|Too Many Requests" -or $LASTEXITCODE -ne 0) {
-    Write-Host "Rate limited or failed. Waiting $($attempt * 30) seconds..."
-    Start-Sleep -Seconds ($attempt * 30)
+  if ($exit -eq 0) {
+    $result = ($response | Out-String) | ConvertFrom-Json
   } else {
-    $result = $response | ConvertFrom-Json
+    $errorText = ($response | Out-String).Trim()
+    Write-Host "Request failed with exit code $exit."
+    Write-Host "----- error details -----"
+    Write-Host $errorText
+    Write-Host "-------------------------"
+    Start-Sleep -Seconds ($attempt * 30)
   }
 }
 
