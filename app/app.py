@@ -1,13 +1,32 @@
+import hmac
 import json
+import logging
+import os
+import time
+
+import requests
 from datetime import datetime, timezone
-from flask import Flask, render_template
+from flask import Flask, jsonify, render_template, request
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
 app = Flask(__name__)
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
 ACCOUNT_NAME = "stportfoliodemo01"
 CONTAINER_NAME = "demo-list"
+
+CONTAINER_APP_NAME = "ca-portfolio-flask"
+RESOURCE_GROUP = "rg-portfolio-demo"
+SUBSCRIPTION_ID = "bb8f8c0b-6d1b-4593-882b-d9f264692833"
+MANAGEMENT_API_VERSION = "2023-05-01"
+
+PIN = os.environ.get("APP_PIN", "")
+
+FAIL_LIMIT = 5
+FAIL_WINDOW_SECONDS = 600
+_failures = {}
 
 RESOURCE_TYPE_LABELS = {
     "storageaccounts": "Storage account",
@@ -23,6 +42,85 @@ def friendly_resource(resource_id):
     rtype = parts[-2] if len(parts) > 1 else ""
     label = RESOURCE_TYPE_LABELS.get(rtype, rtype.upper())
     return name, label
+
+
+def _azure_token():
+    return DefaultAzureCredential().get_token("https://management.azure.com/.default").token
+
+
+def _container_app_url():
+    return (
+        f"https://management.azure.com/subscriptions/{SUBSCRIPTION_ID}"
+        f"/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.App/containerApps/{CONTAINER_APP_NAME}"
+        f"?api-version={MANAGEMENT_API_VERSION}"
+    )
+
+
+def get_container_app():
+    resp = requests.get(
+        _container_app_url(),
+        headers={"Authorization": f"Bearer {_azure_token()}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_control_state():
+    app = get_container_app()
+    scale = app["properties"]["template"].get("scale") or {}
+    return "stopped" if scale.get("maxReplicas", 0) == 0 else "running"
+
+
+def set_replicas(min_replicas, max_replicas):
+    app = get_container_app()
+    template = app["properties"]["template"]
+    template.setdefault("scale", {})["minReplicas"] = min_replicas
+    template["scale"]["maxReplicas"] = max_replicas
+
+    body = {
+        "location": app["location"],
+        "identity": app.get("identity"),
+        "properties": {
+            "managedEnvironmentId": app["properties"]["managedEnvironmentId"],
+            "configuration": app["properties"]["configuration"],
+            "template": template,
+        },
+    }
+    resp = requests.put(
+        _container_app_url(),
+        headers={
+            "Authorization": f"Bearer {_azure_token()}",
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _client_locked(ip):
+    rec = _failures.get(ip)
+    if not rec:
+        return False
+    if time.time() - rec["first"] > FAIL_WINDOW_SECONDS:
+        _failures.pop(ip, None)
+        return False
+    return rec["count"] >= FAIL_LIMIT
+
+
+def _record_failure(ip):
+    rec = _failures.get(ip)
+    now = time.time()
+    if rec and now - rec["first"] <= FAIL_WINDOW_SECONDS:
+        rec["count"] += 1
+    else:
+        _failures[ip] = {"count": 1, "first": now}
+
+
+def _pin_ok(candidate):
+    return bool(PIN) and hmac.compare_digest(str(candidate), PIN)
 
 
 def get_suggestions(latest):
@@ -153,6 +251,49 @@ def dashboard():
         trend_totals=[h["total"] for h in history],
         suggestions=get_suggestions(latest),
     )
+
+
+@app.route("/state")
+def control_state():
+    try:
+        return jsonify(ok=True, state=get_control_state())
+    except Exception as exc:
+        logging.error("state check failed: %s", exc)
+        return jsonify(ok=False, error="Unable to read container app state"), 500
+
+
+@app.route("/action", methods=["POST"])
+def control_action():
+    ip = request.remote_addr or "unknown"
+    data = request.get_json(silent=True) or {}
+    action = data.get("action")
+    pin = data.get("pin", "")
+
+    if _client_locked(ip):
+        logging.warning("denied (rate limit) ip=%s action=%s", ip, action)
+        return jsonify(ok=False, error="Too many failed attempts. Try again in a few minutes."), 429
+
+    if not _pin_ok(pin):
+        _record_failure(ip)
+        logging.warning("denied (bad pin) ip=%s action=%s", ip, action)
+        return jsonify(ok=False, error="Invalid PIN"), 401
+
+    _failures.pop(ip, None)
+
+    targets = {"stop": (0, 0), "start": (1, 10)}
+    if action not in targets:
+        logging.warning("rejected (unknown action) ip=%s action=%s", ip, action)
+        return jsonify(ok=False, error="Unknown action"), 400
+
+    try:
+        min_replicas, max_replicas = targets[action]
+        set_replicas(min_replicas, max_replicas)
+        state = "stopped" if action == "stop" else "running"
+        logging.info("success action=%s ip=%s", action, ip)
+        return jsonify(ok=True, state=state)
+    except Exception as exc:
+        logging.error("action failed action=%s ip=%s error=%s", action, ip, exc)
+        return jsonify(ok=False, error="Azure update failed: " + str(exc)), 500
 
 
 if __name__ == "__main__":

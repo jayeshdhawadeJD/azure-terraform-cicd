@@ -27,6 +27,17 @@ variable "image_tag" {
   default     = "latest"
 }
 
+# NOTE: sensitive = true only hides the value from console/plan output.
+# The PIN still lands in PLAINTEXT in the tfstate file (stored in the private
+# tfstatejd2026 blob container, access-gated via RBAC). This is the first
+# application-level secret going into state; keep the state container locked
+# down as it already is.
+variable "dashboard_pin" {
+  description = "PIN required to trigger stop/start actions from the dashboard"
+  type        = string
+  sensitive   = true
+}
+
 resource "azurerm_resource_group" "demo" {
   name     = "rg-portfolio-demo"
   location = "centralindia"
@@ -57,15 +68,32 @@ resource "azurerm_container_app" "demo" {
   container_app_environment_id = azurerm_container_app_environment.demo.id
   resource_group_name          = azurerm_resource_group.demo.name
   revision_mode                = "Single"
-   identity {
+
+  secrets {
+    name  = "dashboard-pin"
+    value = var.dashboard_pin
+  }
+
+  identity {
     type = "SystemAssigned"
   }
+
   template {
     container {
       name   = "flask-app"
       image  = "ghcr.io/jayeshdhawadejd/azure-terraform-cicd/portfolio-flask:${var.image_tag}"
       cpu    = 0.25
       memory = "0.5Gi"
+
+      env {
+        name        = "APP_PIN"
+        secret_name = "dashboard-pin"
+      }
+    }
+
+    scale {
+      min_replicas = 1
+      max_replicas = 10
     }
   }
 

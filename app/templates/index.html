@@ -102,6 +102,54 @@
         .suggestion.danger .dot { background: #f87171; box-shadow: 0 0 12px #f87171; }
         .suggestion .title { font-weight: 600; font-size: 14.5px; }
         .suggestion .msg { color: var(--muted); font-size: 13.5px; margin-top: 3px; }
+
+        .control-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 5px 12px; border-radius: 999px; }
+        .status.running { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+        .status.stopped { background: rgba(248, 113, 113, 0.12); color: #f87171; }
+        .status .led { width: 9px; height: 9px; border-radius: 50%; }
+        .status.running .led { background: #34d399; box-shadow: 0 0 10px #34d399; }
+        .status.stopped .led { background: #f87171; box-shadow: 0 0 10px #f87171; }
+        .btn {
+            border: none; cursor: pointer; padding: 9px 18px; border-radius: 10px;
+            font-size: 13.5px; font-weight: 600; color: #0b1020;
+            transition: transform .1s ease, opacity .1s ease;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+        .btn.danger { background: linear-gradient(135deg, #f87171, #ef4444); }
+        .btn.logout { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+        .stopped-msg { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: rgba(248, 113, 113, 0.08); border-left: 3px solid #f87171; font-size: 13.5px; }
+        .stopped-msg a { color: var(--accent); }
+
+        .overlay {
+            position: fixed; inset: 0; background: rgba(2, 6, 23, 0.7);
+            display: none; align-items: center; justify-content: center; z-index: 50;
+        }
+        .overlay.show { display: flex; }
+        .modal {
+            width: min(360px, 90vw); background: #111a35; border: 1px solid var(--panel-border);
+            border-radius: 16px; padding: 24px;
+        }
+        .modal h3 { font-size: 16px; margin-bottom: 6px; }
+        .modal p { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+        .modal input {
+            width: 100%; padding: 11px 12px; border-radius: 10px; font-size: 16px;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border); color: var(--text);
+            letter-spacing: 4px; text-align: center; margin-bottom: 14px;
+        }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn.ghost { background: rgba(255,255,255,0.08); color: var(--text); }
+        .btn.errornote { background: rgba(255,255,255,0.08); color: var(--text); }
+
+        .toast {
+            position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
+            padding: 12px 20px; border-radius: 12px; font-size: 13.5px; opacity: 0;
+            pointer-events: none; transition: all .25s ease; z-index: 60;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.ok { background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+        .toast.err { background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
     </style>
 </head>
 <body>
@@ -166,6 +214,23 @@
     </div>
 
     <div class="panel">
+        <h2>Resource Controls</h2>
+        <div class="hint">Manage running resources to control cost</div>
+        <div class="control-row">
+            <span class="badge">ca-portfolio-flask</span>
+            <span id="ctrl-state" class="status running"><span class="led"></span>Checking…</span>
+            <button id="btn-stop" class="btn danger" hidden>Stop app</button>
+        </div>
+        <div id="ctrl-stopped" class="stopped-msg" hidden>
+            This dashboard is <strong>stopped</strong> (0 replicas) — no compute is running, so no app cost.
+            <br><br>
+            Restore it by running the
+            <a href="https://github.com/jayeshdhawadeJD/azure-terraform-cicd/actions" target="_blank" rel="noopener">Terraform CI/CD workflow (workflow_dispatch)</a>
+            in GitHub Actions — Terraform will see the scale drift and restart the app.
+        </div>
+    </div>
+
+    <div class="panel">
         <h2>Resource Breakdown</h2>
         <div class="hint">Cost by resource, highest first</div>
         {% if resources %}
@@ -191,6 +256,20 @@
 
     <footer>Pulled daily by GitHub Actions from Azure Cost Management API &middot; Rendered by Flask on Azure Container Apps &middot; Managed identity &mdash; no secrets</footer>
 </div>
+
+<div class="overlay" id="pin-overlay">
+    <div class="modal">
+        <h3 id="modal-title">Confirm action</h3>
+        <p id="modal-desc">Enter your dashboard PIN to continue.</p>
+        <input type="password" id="pin-input" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="off">
+        <div class="modal-actions">
+            <button class="btn ghost" id="pin-cancel">Cancel</button>
+            <button class="btn danger" id="pin-confirm">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
     const labels = {{ trend_labels | tojson }};
@@ -257,6 +336,107 @@
         }
         requestAnimationFrame(tick);
     });
+
+    // ---- Resource Controls ----
+    const ctrlState = document.getElementById('ctrl-state');
+    const btnStop = document.getElementById('btn-stop');
+    const ctrlStopped = document.getElementById('ctrl-stopped');
+    const overlay = document.getElementById('pin-overlay');
+    const pinInput = document.getElementById('pin-input');
+    const pinConfirm = document.getElementById('pin-confirm');
+    const pinCancel = document.getElementById('pin-cancel');
+    const toast = document.getElementById('toast');
+
+    let pendingAction = null;
+
+    function setBadge(state) {
+        if (state === 'stopped') {
+            ctrlState.className = 'status stopped';
+            ctrlState.querySelector('.led').style.display = '';
+            ctrlState.innerHTML = '<span class="led"></span>Stopped';
+            btnStop.hidden = true;
+            ctrlStopped.hidden = false;
+        } else if (state === 'running') {
+            ctrlState.className = 'status running';
+            ctrlState.innerHTML = '<span class="led"></span>Running';
+            btnStop.hidden = false;
+            ctrlStopped.hidden = true;
+        } else {
+            ctrlState.className = 'status';
+            ctrlState.textContent = 'Unknown';
+        }
+    }
+
+    function showToast(msg, ok) {
+        toast.className = 'toast ' + (ok ? 'ok' : 'err');
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    async function refreshState() {
+        try {
+            const res = await fetch('/state');
+            const data = await res.json();
+            if (data.ok) setBadge(data.state);
+            else setBadge('unknown');
+        } catch (e) {
+            setBadge('unknown');
+        }
+    }
+
+    function openModal() {
+        pendingAction = 'stop';
+        document.getElementById('modal-title').textContent = 'Stop this app?';
+        document.getElementById('modal-desc').textContent = 'This will scale the container app to 0 replicas and take the dashboard offline. Restore via the Terraform CI/CD workflow.';
+        pinInput.value = '';
+        pinConfirm.className = 'btn danger';
+        pinConfirm.textContent = 'Stop app';
+        overlay.classList.add('show');
+        setTimeout(() => pinInput.focus(), 50);
+    }
+
+    function closeModal() {
+        overlay.classList.remove('show');
+        pendingAction = null;
+    }
+
+    async function confirmAction() {
+        const pin = pinInput.value.trim();
+        if (!pin) return;
+        pinConfirm.disabled = true;
+        try {
+            const res = await fetch('/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: pendingAction, pin })
+            });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                showToast('Stopped. The app is now scaled to 0 replicas.', true);
+                setBadge('stopped');
+            } else if (res.status === 401) {
+                showToast('Invalid PIN.', false);
+                pinInput.value = '';
+            } else if (res.status === 429) {
+                showToast('Too many failed attempts. Try again in a few minutes.', false);
+                closeModal();
+            } else {
+                showToast(data.error || 'Action failed.', false);
+            }
+        } catch (e) {
+            showToast('Network error — could not reach the app.', false);
+        } finally {
+            pinConfirm.disabled = false;
+        }
+    }
+
+    btnStop.addEventListener('click', openModal);
+    pinCancel.addEventListener('click', closeModal);
+    pinConfirm.addEventListener('click', confirmAction);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    refreshState();
 </script>
 </body>
 </html>
