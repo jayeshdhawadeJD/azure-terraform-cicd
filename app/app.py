@@ -78,12 +78,16 @@ def set_replicas(min_replicas, max_replicas):
     template.setdefault("scale", {})["minReplicas"] = min_replicas
     template["scale"]["maxReplicas"] = max_replicas
 
+    configuration = app["properties"]["configuration"]
+    configuration = dict(configuration)
+    configuration.pop("secrets", None)
+
     body = {
         "location": app["location"],
-        "identity": app.get("identity"),
+        "identity": {"type": "SystemAssigned"},
         "properties": {
             "managedEnvironmentId": app["properties"]["managedEnvironmentId"],
-            "configuration": app["properties"]["configuration"],
+            "configuration": configuration,
             "template": template,
         },
     }
@@ -96,6 +100,8 @@ def set_replicas(min_replicas, max_replicas):
         json=body,
         timeout=60,
     )
+    if resp.status_code >= 400:
+        logging.error("PUT failed status=%s body=%s", resp.status_code, resp.text)
     resp.raise_for_status()
     return resp.json()
 
