@@ -35,15 +35,17 @@ if ($null -eq $result) {
   throw "Failed to get cost data after $maxRetries attempts"
 }
 
+$resources = @($result.properties.rows | ForEach-Object {
+  @{
+    resourceId = $_[1]
+    cost       = [math]::Round($_[0], 4)
+    currency   = $_[2]
+  }
+})
+
 $costData = @{
   date       = (Get-Date -Format "yyyy-MM-dd")
-  resources  = $result.properties.rows | ForEach-Object {
-    @{
-      resourceId = $_[1]
-      cost       = [math]::Round($_[0], 4)
-      currency   = $_[2]
-    }
-  }
+  resources  = $resources
 }
 
 $costData | ConvertTo-Json -Depth 3 | Out-File $outputFile -Encoding utf8

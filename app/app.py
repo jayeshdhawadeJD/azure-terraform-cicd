@@ -187,7 +187,7 @@ def fetch_all_cost_data():
     for blob in blobs:
         raw = container.get_blob_client(blob.name).download_blob().readall().decode("utf-8-sig")
         data = json.loads(raw)
-        resources = data.get("resources", [])
+        resources = data.get("resources") or []
         history.append({
             "filename": blob.name,
             "date": data.get("date", blob.name),
