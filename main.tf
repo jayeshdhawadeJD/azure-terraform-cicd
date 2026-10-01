@@ -69,7 +69,7 @@ resource "azurerm_container_app" "demo" {
   resource_group_name          = azurerm_resource_group.demo.name
   revision_mode                = "Single"
 
-  secrets {
+  secret {
     name  = "dashboard-pin"
     value = var.dashboard_pin
   }
@@ -91,10 +91,8 @@ resource "azurerm_container_app" "demo" {
       }
     }
 
-    scale {
-      min_replicas = 1
-      max_replicas = 10
-    }
+min_replicas = 1
+    max_replicas = 10
   }
 
   ingress {
