@@ -123,23 +123,30 @@ def _pin_ok(candidate):
     return bool(PIN) and hmac.compare_digest(str(candidate), PIN)
 
 
-def get_suggestions(latest):
+def get_suggestions(newest, snapshot=None):
     suggestions = []
 
     try:
-        date_str = latest["filename"].replace("cost-data-", "").replace(".json", "")
+        date_str = newest["filename"].replace("cost-data-", "").replace(".json", "")
         data_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         age_days = (datetime.now(timezone.utc).date() - data_date).days
         if age_days > 1:
             suggestions.append({
                 "level": "warning",
                 "title": "Cost data may be stale",
-                "message": f"Latest data is {age_days} days old ({latest['date']}). Check the Cost Data Pull workflow."
+                "message": f"Latest data is {age_days} days old ({newest['date']}). Check the Cost Data Pull workflow."
             })
     except ValueError:
         pass
 
-    resources = latest.get("resources", [])
+    if snapshot is not None and snapshot["filename"] != newest["filename"]:
+        suggestions.append({
+            "level": "info",
+            "title": "Showing last snapshot",
+            "message": f"Cost data for {newest['date']} isn't reported yet (a new billing month often starts empty). Displaying the last available snapshot from {snapshot['date']}."
+        })
+
+    resources = (snapshot or {}).get("resources") or []
     if not resources:
         return suggestions
 
@@ -217,11 +224,29 @@ def dashboard():
             suggestions=[],
         )
 
-    latest = history[-1]
-    resources = latest["resources"]
+    newest = history[-1]
+    snapshot = next((h for h in reversed(history) if h["resources"]), None)
+
+    if snapshot is None:
+        return render_template(
+            "index.html",
+            empty=True,
+            resources=[],
+            data_date=newest["date"],
+            currency="INR",
+            total_cost="—",
+            total_cost_raw=0,
+            resource_count=0,
+            days_tracked=len(history),
+            trend_labels=[h["date"] for h in history],
+            trend_totals=[h["total"] for h in history],
+            suggestions=get_suggestions(newest, None),
+        )
+
+    resources = snapshot["resources"]
     currency = resources[0].get("currency", "INR") if resources else "INR"
     symbol = "₹" if currency.upper() == "INR" else f"{currency} "
-    total = latest["total"]
+    total = snapshot["total"]
 
     rows = []
     for r in resources:
@@ -241,7 +266,7 @@ def dashboard():
         "index.html",
         empty=False,
         resources=rows,
-        data_date=latest["date"],
+        data_date=snapshot["date"],
         currency=currency,
         total_cost=f"{symbol}{total:,.4f}",
         total_cost_raw=total,
@@ -249,7 +274,7 @@ def dashboard():
         days_tracked=len(history),
         trend_labels=[h["date"] for h in history],
         trend_totals=[h["total"] for h in history],
-        suggestions=get_suggestions(latest),
+        suggestions=get_suggestions(newest, snapshot),
     )
 
 
