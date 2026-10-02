@@ -135,7 +135,7 @@ def set_replicas(min_replicas, max_replicas):
     )
     if resp.status_code >= 400:
         logging.error("PUT failed status=%s body=%s", resp.status_code, resp.text)
-    resp.raise_for_status()
+        raise RuntimeError(f"Azure update failed ({resp.status_code}): {resp.text[:500]}")
     return resp.json()
 
 
