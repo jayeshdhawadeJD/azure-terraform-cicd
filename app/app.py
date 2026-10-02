@@ -72,23 +72,52 @@ def get_control_state():
     return "stopped" if scale.get("maxReplicas", 0) == 0 else "running"
 
 
-def set_replicas(min_replicas, max_replicas):
-    app = get_container_app()
-    template = app["properties"]["template"]
-    template.setdefault("scale", {})["minReplicas"] = min_replicas
-    template["scale"]["maxReplicas"] = max_replicas
+def _container_secrets_url():
+    return (
+        f"https://management.azure.com/subscriptions/{SUBSCRIPTION_ID}"
+        f"/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.App/containerApps/{CONTAINER_APP_NAME}"
+        f"/secrets?api-version={MANAGEMENT_API_VERSION}"
+    )
 
-    configuration = app["properties"]["configuration"]
-    configuration = dict(configuration)
-    configuration.pop("secrets", None)
+
+def get_secrets():
+    resp = requests.get(
+        _container_secrets_url(),
+        headers={"Authorization": f"Bearer {_azure_token()}"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json().get("value", [])
+
+
+def set_replicas(min_replicas, max_replicas):
+    current = get_container_app()
+    template = current["properties"]["template"]
+    ing = current["properties"]["configuration"]["ingress"]
 
     body = {
-        "location": app["location"],
+        "location": current["location"],
         "identity": {"type": "SystemAssigned"},
         "properties": {
-            "managedEnvironmentId": app["properties"]["managedEnvironmentId"],
-            "configuration": configuration,
-            "template": template,
+            "managedEnvironmentId": current["properties"]["managedEnvironmentId"],
+            "configuration": {
+                "activeRevisionsMode": current["properties"]["configuration"]["activeRevisionsMode"],
+                "ingress": {
+                    "external": ing["external"],
+                    "targetPort": ing["targetPort"],
+                    "allowInsecure": ing.get("allowInsecure", False),
+                    "transport": ing.get("transport", "Auto"),
+                    "traffic": [
+                        {"weight": t.get("weight", 100), "latestRevision": t.get("latestRevision", True)}
+                        for t in ing["traffic"]
+                    ],
+                },
+                "secrets": get_secrets(),
+            },
+            "template": {
+                "containers": template["containers"],
+                "scale": {"minReplicas": min_replicas, "maxReplicas": max_replicas},
+            },
         },
     }
     resp = requests.put(
