@@ -76,14 +76,18 @@ def _container_secrets_url():
     return (
         f"https://management.azure.com/subscriptions/{SUBSCRIPTION_ID}"
         f"/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.App/containerApps/{CONTAINER_APP_NAME}"
-        f"/secrets?api-version={MANAGEMENT_API_VERSION}"
+        f"/listSecrets?api-version={MANAGEMENT_API_VERSION}"
     )
 
 
 def get_secrets():
-    resp = requests.get(
+    resp = requests.post(
         _container_secrets_url(),
-        headers={"Authorization": f"Bearer {_azure_token()}"},
+        headers={
+            "Authorization": f"Bearer {_azure_token()}",
+            "Content-Type": "application/json",
+        },
+        json={},
         timeout=30,
     )
     resp.raise_for_status()
