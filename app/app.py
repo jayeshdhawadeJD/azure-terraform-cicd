@@ -68,74 +68,31 @@ def get_container_app():
 
 def get_control_state():
     app = get_container_app()
-    scale = app["properties"]["template"].get("scale") or {}
-    return "stopped" if scale.get("maxReplicas", 0) == 0 else "running"
+    status = app["properties"].get("runningStatus", "Running")
+    return "stopped" if status.lower() == "stopped" else "running"
 
 
-def _container_secrets_url():
+def _container_app_action_url(action):
     return (
         f"https://management.azure.com/subscriptions/{SUBSCRIPTION_ID}"
         f"/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.App/containerApps/{CONTAINER_APP_NAME}"
-        f"/listSecrets?api-version={MANAGEMENT_API_VERSION}"
+        f"/{action}?api-version={MANAGEMENT_API_VERSION}"
     )
 
 
-def get_secrets():
+def toggle_app(action):
     resp = requests.post(
-        _container_secrets_url(),
+        _container_app_action_url(action),
         headers={
             "Authorization": f"Bearer {_azure_token()}",
             "Content-Type": "application/json",
         },
         json={},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json().get("value", [])
-
-
-def set_replicas(min_replicas, max_replicas):
-    current = get_container_app()
-    template = current["properties"]["template"]
-    ing = current["properties"]["configuration"]["ingress"]
-
-    body = {
-        "location": current["location"],
-        "identity": {"type": "SystemAssigned"},
-        "properties": {
-            "managedEnvironmentId": current["properties"]["managedEnvironmentId"],
-            "configuration": {
-                "activeRevisionsMode": current["properties"]["configuration"]["activeRevisionsMode"],
-                "ingress": {
-                    "external": ing["external"],
-                    "targetPort": ing["targetPort"],
-                    "allowInsecure": ing.get("allowInsecure", False),
-                    "transport": ing.get("transport", "Auto"),
-                    "traffic": [
-                        {"weight": t.get("weight", 100), "latestRevision": t.get("latestRevision", True)}
-                        for t in ing["traffic"]
-                    ],
-                },
-                "secrets": get_secrets(),
-            },
-            "template": {
-                "containers": template["containers"],
-                "scale": {"minReplicas": min_replicas, "maxReplicas": max_replicas},
-            },
-        },
-    }
-    resp = requests.put(
-        _container_app_url(),
-        headers={
-            "Authorization": f"Bearer {_azure_token()}",
-            "Content-Type": "application/json",
-        },
-        json=body,
         timeout=60,
     )
     if resp.status_code >= 400:
-        logging.error("PUT failed status=%s body=%s", resp.status_code, resp.text)
-        raise RuntimeError(f"Azure update failed ({resp.status_code}): {resp.text[:500]}")
+        logging.error("%s failed status=%s body=%s", action, resp.status_code, resp.text)
+        raise RuntimeError(f"{action} failed ({resp.status_code}): {resp.text[:500]}")
     return resp.json()
 
 
@@ -344,14 +301,13 @@ def control_action():
 
     _failures.pop(ip, None)
 
-    targets = {"stop": (0, 0), "start": (1, 10)}
+    targets = {"stop": "stop", "start": "start"}
     if action not in targets:
         logging.warning("rejected (unknown action) ip=%s action=%s", ip, action)
         return jsonify(ok=False, error="Unknown action"), 400
 
     try:
-        min_replicas, max_replicas = targets[action]
-        set_replicas(min_replicas, max_replicas)
+        toggle_app(targets[action])
         state = "stopped" if action == "stop" else "running"
         logging.info("success action=%s ip=%s", action, ip)
         return jsonify(ok=True, state=state)
