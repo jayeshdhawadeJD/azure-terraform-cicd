@@ -98,3 +98,9 @@ jobs:
             -e ARM_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
             -e ARM_USE_OIDC=true \
             hashicorp/terraform:1.10.5 apply -auto-approve -var image_tag=${{ github.sha }} -var dashboard_pin=${{ secrets.DASHBOARD_PIN }}
+
+      - name: Ensure container app is running
+        run: |
+          az rest --method post --url \
+            "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/rg-portfolio-demo/providers/Microsoft.App/containerApps/ca-portfolio-flask/start?api-version=2024-03-01" \
+            --body "{}"
