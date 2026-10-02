@@ -20,7 +20,7 @@ CONTAINER_NAME = "demo-list"
 CONTAINER_APP_NAME = "ca-portfolio-flask"
 RESOURCE_GROUP = "rg-portfolio-demo"
 SUBSCRIPTION_ID = "bb8f8c0b-6d1b-4593-882b-d9f264692833"
-MANAGEMENT_API_VERSION = "2023-05-01"
+MANAGEMENT_API_VERSION = "2024-03-01"
 
 PIN = os.environ.get("APP_PIN", "")
 
